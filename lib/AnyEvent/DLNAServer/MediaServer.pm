@@ -242,36 +242,46 @@ sub serve_media_file {
 };
 
 sub serve_media_stream {
-    my( $self, $info, $status, $headers, $req )= @_;
-    my $yt= 'http://r2---sn-9nj-4g5e.googlevideo.com/videoplayback?mv=m&itag=22&gcr=de&ms=au&id=o-AMzReLRyEurgm_qRaACzUcDPY4GYrf6KAN_2ymw_uIWb&fexp=917000%2C919120%2C942000%2C945012%2C916612%2C913434%2C939940%2C923341%2C936923%2C945044&sver=3&expire=1400104806&key=yt5&ip=92.193.104.236&upn=wDLL7SWuxpI&mws=yes&sparams=gcr%2Cid%2Cip%2Cipbits%2Citag%2Cratebypass%2Csource%2Cupn%2Cexpire&source=youtube&mt=1400081031&ratebypass=yes&ipbits=0&signature=F14FBE84B0D2FA03AB1F10E372EF2CD755BA6826.9B8EF0D1C973C30906C213181B77A535B3B32A0B';
-    my $yt_uri= URI->new($yt);
+    my( $self, $info, $status, $response_headers, $req )= @_;
 
     my %request_headers;
     # Copy some choice headers across to Google
-    my $in_headers= $req->headers->as_hashref;
     for (qw(range)) {
-        $request_headers{ $_ }= $in_headers->{ $_ };
+        $request_headers{ $_ }= $req->headers->header( $_ );
     };
+    
+    my $method= $req->method;
 
     my $header_response= sub {
         my( $write_header )= @_;
-        warn "Starting to respond";
+        warn "Starting to respond to $method";
         #warn "Fetching YT";
         my $body_writer;
         my $get_guard;
-        $get_guard= http_request GET => $yt,
+        # We shouldn't necessarily launch more than one HEAD request at the remote site...
+        $get_guard= http_request $method => $info->{url},
             headers => \%request_headers,
             on_header => sub {
-                my($headers)= @_;
-                warn "Header response: " . $headers->{Status};
-                $headers->{ "Content-Type" }= $headers->{"content-type"};
-                $headers->{ "Content-Length" }= $headers->{"content-length"};
-                $headers->{ "Content-Range" }= $headers->{"content-range"}
-                    if $headers->{"content-range"};
-                $status= $headers->{Status}; # Pass through errors and Range replies
-                warn Dumper [%$headers];
-                $body_writer= $write_header->( [$status, [ %$headers ] ]);
+                my($remote_headers)= @_;
+                warn "URL: $method response: " . Dumper $remote_headers;
+                for (qw( content-type content-length content-range )) {
+                    $response_headers->{ $_ }= $remote_headers->{ $_ }
+                        if defined $remote_headers->{ $_ };
+                };
+                $response_headers->{ "content-type" } =~ s!/mp4$!/mp4v!;
+                #$response_headers->{ "content-type" }= 'video/avi';
+                $status= $remote_headers->{Status}; # Pass through errors and Range replies
+                warn Dumper [%$response_headers];
+                $body_writer= $write_header->( [$status, [ %$response_headers ] ]);
                 #warn "Wrote header, have body part $body_writer, waiting for body";
+                
+                if('HEAD' eq $method) {
+                    undef $get_guard;
+                    $body_writer->write('');
+                    $body_writer->close;
+                    return 0; # we're done
+                };
+                
                 return 1; # continue
             },
             on_body => sub {
