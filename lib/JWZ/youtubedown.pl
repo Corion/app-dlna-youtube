@@ -2071,7 +2071,6 @@ sub download_video_url($$$$$$$) {
     print STDERR "$progname: downloading \"$title\"\n" if ($verbose);
 
     my $expect_bytes = ($size ? ($progress_p ? $size : -$size) : undef);
-    warn "Final URL: $url";
     my ($http, $head, $body) = get_url ($url, undef, undef, 0, $file, undef,
                                         undef, $expect_bytes);
     check_http_status ($url, $http, 2);  # internal error if still 403
