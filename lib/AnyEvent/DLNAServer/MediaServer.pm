@@ -285,7 +285,7 @@ sub serve_media_stream {
                         $body_writer->write( $partial_body );
                         $continue= 1;
                     };
-                    warn $@ if not $continue;
+                    warn "(caught) $@" if not $continue;
                 } else {
                     $continue= 0
                 };
