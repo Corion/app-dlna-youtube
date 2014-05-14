@@ -160,9 +160,9 @@ sub serve_media {
 
     #my($w,$h,$s)= 
     my $status= 200;
-    $response_header{ "Content-Length" }= $info->{file_size}
+    $response_header{ "content-length" }= $info->{file_size}
         if $info->{file_size};
-    $response_header{ "Content-Type" }= $info->{ct};
+    $response_header{ "content-type" }= $info->{ct};
     
     if( "local" eq $info->{method}) {
         return $self->serve_media_file( $info, $status, \%response_header, $req );
@@ -185,13 +185,13 @@ sub serve_media_file {
             and $req->headers->{range} =~ /bytes\s*=\s*(\d+)-(\d+)?/) {
         ($startrange,$endrange) = ($1, ($2 || $endrange));
         $status= 206;
-        $headers->{ "Content-Range" }= "bytes $startrange-$endrange/$size";
+        $headers->{ "content-range" }= "bytes $startrange-$endrange/$size";
 
         warn "Seeking to $startrange";
         seek $fh, $startrange,0
           or warn "Couldn't seek in $info->{url} : $!";
         my $left= $endrange - $startrange;
-        $headers->{"Content-Length"}= $left;
+        $headers->{"content-length"}= $left;
         warn "Serving $left bytes";
     };
 
