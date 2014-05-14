@@ -69,7 +69,8 @@ sub load_youtubedown {
     local *setlocale = sub {};
 
     # Make the program think it is run from the console    
-    local $ENV{REQUEST_URI};
+    #local $ENV{REQUEST_URI};
+    local *ENV;
     
     # The program wants to reopen/binmode STDOUT and prints to STDERR
     local *STDERR;
