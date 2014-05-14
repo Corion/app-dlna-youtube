@@ -176,9 +176,16 @@ sub serve_media_file {
     # Simply serve a local file first:
     my $local_file= $info->{url};
     my $size= $info->{file_size}; # Save us one stat call :)
-    open my $fh, $local_file
-        or die "Couldn't read '$local_file': $!";
-    binmode $fh;
+    
+    my $method= $req->method;
+    my $fh;
+    if( 'GET' eq $method ) {
+        open $fh, $local_file
+            or die "Couldn't read '$local_file': $!";
+        binmode $fh;
+    };
+
+    warn "File: $method";
 
     my ($startrange, $endrange) = (0,$size-1);
     if( $req->headers->{range}
@@ -186,10 +193,13 @@ sub serve_media_file {
         ($startrange,$endrange) = ($1, ($2 || $endrange));
         $status= 206;
         $headers->{ "content-range" }= "bytes $startrange-$endrange/$size";
+        $headers->{ "content-type" }= "video/mp4v"; # faake, and bad if we serve an .avi :)
 
         warn "Seeking to $startrange";
-        seek $fh, $startrange,0
-          or warn "Couldn't seek in $info->{url} : $!";
+        if( $fh ) {
+            seek $fh, $startrange,0
+              or warn "Couldn't seek in $info->{url} : $!";
+          };
         my $left= $endrange - $startrange;
         $headers->{"content-length"}= $left;
         warn "Serving $left bytes";
@@ -200,6 +210,10 @@ sub serve_media_file {
         
         my $body_writer= $write_header->([ $status, [ %$headers ]]);
 
+        if( 'HEAD' eq $method ) {
+            $body_writer->close;
+            return;
+        };
         my $timer; $timer= AnyEvent->timer( after => 0, interval => 1, cb => sub {
             $|++;
             print ".";
