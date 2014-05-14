@@ -44,7 +44,7 @@ sub fetch_url_info {
     use Data::Dumper;
     *JWZ::YouTubeDown::jwz_youtubedown::get_url= sub {
         warn "get_url: " . Dumper [@_];
-        if( $_[0] !~ /\.googlevideo\.com/ ) {
+        if( $_[0] !~ /\.googlevideo\.com/ and $_[0] !~ /\.vimeocdn\.com/ ) {
             goto &$orig_get_url;
         } else {
             # We found the (Google) URL we're looking for
