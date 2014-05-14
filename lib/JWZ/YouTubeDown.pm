@@ -25,6 +25,39 @@ sub download_video_url {
     );
 };
 
+sub fetch_url_info {
+    my( $url, %options )= @_;
+    my $info= {};
+
+    # Silence youtubedown...
+    #local *STDERR;
+    #local *STDOUT;
+    #open( STDERR, '>', \my $stderr );
+    #open( STDOUT, '>', \my $stdout );
+
+
+    # Youtubedown brings its own HTTP implementation. We force our own down its throat instead:
+    no warnings 'redefine';
+    # Maybe only do that if we detect that AnyEvent is loaded?!
+    # Or via some import parameter, 
+    my $orig_get_url= \&JWZ::YouTubeDown::jwz_youtubedown::get_url;
+    use Data::Dumper;
+    *JWZ::YouTubeDown::jwz_youtubedown::get_url= sub {
+        warn "get_url: " . Dumper [@_];
+        if( $_[0] !~ /\.googlevideo\.com/ ) {
+            goto &$orig_get_url;
+        } else {
+            # We found the (Google) URL we're looking for
+            @{ $info }{qw( url referer headers file_size )}= @_[0,1,2,7];
+        };
+    };
+    JWZ::YouTubeDown::jwz_youtubedown::download_video_url(
+        #($url, $title, undef, $size_p, $progress_p, 0, $fmt);
+        $url, undef, undef, undef, undef, 0, undef
+    );
+    $info
+};
+
 =head1 HOW IT WORKS
 
 The module includes a copy of the C<youtubedown>
@@ -90,12 +123,6 @@ sub load_youtubedown {
         die $@ if $@; # eval error
         die $! if $!; # file error
     };
-    
-    # Youtubedown brings its own HTTP implementation. We force our own down its throat instead:
-    no warnings 'redefine';
-    # Maybe only do that if we detect that AnyEvent is loaded?!
-    # Or via some import parameter, 
-    #*get_url= ($;$$$$$$$) { do_http_request, synchronously }
 }
 
 1;
