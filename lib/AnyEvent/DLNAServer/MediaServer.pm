@@ -20,10 +20,11 @@ $stream_from_disk_rate= 1024*1024*10; # stream 10 MB/s per stream from disk
 
 sub fetch_info {
     my( $class, $url )= @_;
-    my $yt= WebService::GData::YouTube->new();
-    (my $id)= $url=~m!([^/]+)$!;
-    croak "No YouTube id found in '$url'" unless $id;
-    return $yt->get_video_by_id($id);
+    #my $yt= WebService::GData::YouTube->new();
+    #(my $id)= $url=~m!([^/]+)$!;
+    #croak "No YouTube id found in '$url'" unless $id;
+    #return $yt->get_video_by_id($id);
+    return {}
 };
 
 sub new {
@@ -90,14 +91,16 @@ sub add_file {
     return $self->add_stream_info( $info );
 };
 
-sub fetch_video_info {
-    my( $self, $url )= @_;
+sub add_url {
+    my( $self, $url, %options )= @_;
     # XXX This should be asynchronous
+    # Also, there is pre-existing information that should be cached/passed in here!
     my $v= $self->fetch_info( $url );
     $self->add_stream_info({
+        url => $url,
         # max_size
         max_size => { x => undef, y => undef },
-        duration => $v->duration,
+        #duration => $v->duration,
         # Well, we should find out:
         file_size => undef,
         method => "stream",
@@ -107,7 +110,7 @@ sub fetch_video_info {
 sub add_stream_info {
     my( $self, $info )= @_;
     
-    # Canonicalize URL
+    # Canonicalize URL, so that identical URLs get the same (internal) hash
 
     # Use bas36 or something more compact later
     my $id= sha256_hex($info->{url});
@@ -208,6 +211,7 @@ sub serve_media_file {
     my $header_response= sub {
         my( $write_header )= @_;
         
+        warn "File: $method response: " . Dumper $headers;
         my $body_writer= $write_header->([ $status, [ %$headers ]]);
 
         if( 'HEAD' eq $method ) {
@@ -325,11 +329,11 @@ sub find_target_transcoder {
     
         input_format => {
             # 37  MP4 h.264 3653 Kbps 1920x1080 29.970 fps  AAC 128 Kbps  2ch 44.10 KHz
-            ct => 'video/mp4',
+            ct => 'video/mp4v',
         },
         output_format => {
             # 37  MP4 h.264 3653 Kbps 1920x1080 29.970 fps  AAC 128 Kbps  2ch 44.10 KHz
-            ct => 'video/mp4',
+            ct => 'video/mp4v',
         },
     },
 }
