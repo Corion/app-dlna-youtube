@@ -104,6 +104,9 @@ sub add_url {
         # Well, we should find out:
         file_size => undef,
         method => "stream",
+        additional_headers => {
+            referer => $options{ referrer }, # no typo here
+        },
     });
 };
 
@@ -254,6 +257,12 @@ sub serve_media_stream {
         $request_headers{ $_ }= $req->headers->header( $_ );
     };
     
+    if( $info->{ additional_headers }) {
+        %request_headers= (%request_headers, %{ $info->{ additional_headers }});
+        # http://a75.video2.blip.tv/15300012735231/Penny_Arcade-TheRabbitHole4thPanelEpisode11PennyArcadeTheSeriesSe344.m4v?ri=31407&rs=1626
+        $request_headers{ "user-agent" }= "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:28.0) Gecko/20100101 Firefox/28.0";
+    };
+    
     my $method= $req->method;
 
     my $header_response= sub {
@@ -263,11 +272,19 @@ sub serve_media_stream {
         my $body_writer;
         my $get_guard;
         # We shouldn't necessarily launch more than one HEAD request at the remote site...
+RETRY:
         $get_guard= http_request $method => $info->{url},
             headers => \%request_headers,
             on_header => sub {
                 my($remote_headers)= @_;
+
                 warn "URL: $method response: " . Dumper $remote_headers;
+
+                if( 302 eq $remote_headers->{Status} ) {
+                    $info->{url}= $remote_headers->{location};
+                    return 0;
+                };
+                
                 for (qw( content-type content-length content-range )) {
                     $response_headers->{ $_ }= $remote_headers->{ $_ }
                         if defined $remote_headers->{ $_ };
