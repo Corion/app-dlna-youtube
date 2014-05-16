@@ -5,6 +5,7 @@ use Data::Dumper;
 
 use AnyEvent;
 use AnyEvent::DLNAServer::MediaServer;
+use DLNA::Device;
 use JWZ::YouTubeDown;
 #use Video::FindStream;
 use File::Spec;
@@ -12,7 +13,9 @@ use Getopt::Long;
 
 GetOptions(
     'referrer|r:s' => \my $referrer,
+    'device|d:s' => \my $device_name,
 );
+$device_name||= $ENV{DLNA_VIDEO_RENDERER} || 'TV-46C6700';
 
 my $media= AnyEvent::DLNAServer::MediaServer->new();
 my $info;
@@ -39,12 +42,26 @@ if( @ARGV ) {
 };
 
 my $url= $info->{dlna_url};
-warn "Playing $url";
-system("start perl -w dlna-play-url.pl $url");
-#system(qq{start "Test" "$url"});
 
-warn "Waiting for things to happen";
-#my $done= AnyEvent->condvar;
-#my $timeout= AnyEvent->timer( after => 120, cb => $done );
-#$done->recv;
+
+my $cache_file= 'known_devices.db';
+DLNA::Device::device_cache( $cache_file );
+
+my $device= DLNA::Device::find_device( $device_name )
+    or die "No UPnP device found for '$device_name'";
+
+print sprintf "Playback of %s using %s\n", $url, $device->getfriendlyname;
+
+#system(sprintf q(start perl -Ilib -w dlna-play-url.pl -d %s "%s"), $device->getfriendlyname, $url);
+
+my $renderer = Net::UPnP::AV::MediaRenderer->new();
+use Data::Dumper;
+warn Dumper $device->getservicebyname($Net::UPnP::AV::MediaRenderer::AVTRNSPORT_SERVICE_TYPE);
+$renderer->setdevice($device);
+$renderer->stop();
+
+$renderer->setAVTransportURI(CurrentURI => $url);
+$renderer->play(); 
+
+print "Waiting for things to happen\n";
 AnyEvent->condvar->recv;
