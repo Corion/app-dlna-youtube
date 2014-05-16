@@ -9,7 +9,7 @@ use ExtUtils::MakeMaker qw(WriteMakefile);
 # the contents of the Makefile that is written.
 
 # I should maybe use something like Shipwright...
-regen_README('lib/DLNA/MediaServer.pm');
+regen_README('lib/AnyEvent/DLNAServer/MediaServer.pm');
 #regen_EXAMPLES();
 
 my @tests = map { glob $_ } 't/*.t', 't/*/*.t';
@@ -18,15 +18,15 @@ WriteMakefile1(
     MIN_PERL_VERSION => '5.008', # for sprintf '%2$d', ...
     META_MERGE => {
         resources => {
-            repository => 'http://github.com/Corion/dlna-mediaserver',
+            repository => 'http://github.com/Corion/anyevent-dlnaserver-mediaserver',
         },
     },
     #BUILD_REQUIRES => {
     #    'strict' => 0,
     #},
-    'NAME'          => 'DLNA::MediaServer',
+    'NAME'          => 'AnyEvent::DLNAServer::MediaServer',
     'LICENSE'       => 'perl',
-    'VERSION_FROM'  => 'lib/DLNA/MediaServer.pm', # finds $VERSION
+    'VERSION_FROM'  => 'lib/AnyEvent/DLNAServer/MediaServer.pm', # finds $VERSION
     'PREREQ_PM'     => { 
                         'strict' => 0,
                         'Carp' => 0,
@@ -49,7 +49,7 @@ WriteMakefile1(
                         'URI::file' => 0,
                         
                       }, # e.g., Module::Name => 1.1
-    ABSTRACT_FROM   => 'lib/DLNA/MediaServer.pm', # retrieve abstract from module
+    ABSTRACT_FROM   => 'lib/AnyEvent/DLNAServer/MediaServer.pm', # retrieve abstract from module
     AUTHOR          => 'Max Maischein <corion@cpan.org>',
     test            => { TESTS => join( ' ', @tests ) },
 );
@@ -104,14 +104,14 @@ sub regen_README {
 
 sub regen_EXAMPLES {
     my $perl = $^X;
-    warn "(Re)Creating lib/DLNA/MediaServer/Examples.pm\n";
+    warn "(Re)Creating lib/AnyEvent/DLNAServer/MediaServer/Examples.pm\n";
     if ($perl =~/\s/) {
         $perl = qq{"$perl"};
     };
     my $examples = `$perl -w examples/gen_examples_pod.pl`;
     if ($examples) {
         $examples =~ s/\r\n/\n/g;
-        if (open my $out, '>', 'lib/DLNA/MediaServer/Examples.pm') {
+        if (open my $out, '>', 'lib/AnyEvent/DLNAServer/MediaServer/Examples.pm') {
             binmode $out;
             print $out $examples;
         };
