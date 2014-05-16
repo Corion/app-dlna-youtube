@@ -275,6 +275,9 @@ sub serve_media_stream {
 RETRY:
         $get_guard= http_request $method => $info->{url},
             headers => \%request_headers,
+            handle_params => {
+                max_read_size => 1024*1024, # 1 MB buffer per client connection
+            },
             on_header => sub {
                 my($remote_headers)= @_;
 
@@ -320,15 +323,14 @@ RETRY:
                 } else {
                     $continue= 0
                 };
-                if(! $continue ) {
-                    $body_writer->close;
-                };
                 return $continue
             },
             # Cleanup
             sub { 
                 my( $body, $headers )= @_;
                 #warn "Final response: " . $headers->{Status};
+                print "done\n";
+                $body_writer->close;
                 undef $get_guard;
             };
     };
