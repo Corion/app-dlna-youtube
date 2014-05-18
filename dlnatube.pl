@@ -30,7 +30,9 @@ if( @ARGV ) {
     } elsif ( $resource =~ /vimeo|youtu/ ) {
         # jwz got this
         my $yt_info= JWZ::YouTubeDown::fetch_url_info($resource);
-        $info= $media->add_url($yt_info->{url}, expires => 180);
+        $info= $media->add_url($yt_info->{url}, expires => 180,
+            stream_info => Media::Info::AnyEvent::YouTube->new( url => $resource ),
+        );
     } else {
         # must be a real stream url
         #my $vid_info= Video::FindStream::fetch_url_info($resource) || { url => $resource };
