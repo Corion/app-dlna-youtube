@@ -288,6 +288,9 @@ RETRY:
                     return 0;
                 };
                 
+                # If we find that we don't need to proxy an URL
+                # (based on content-type and client)
+                # just redirect the client to the real source
                 for (qw( content-type content-length content-range )) {
                     $response_headers->{ $_ }= $remote_headers->{ $_ }
                         if defined $remote_headers->{ $_ };
