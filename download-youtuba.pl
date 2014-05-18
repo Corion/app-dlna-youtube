@@ -1,5 +1,6 @@
 #!perl -w
 use strict;
 use JWZ::YouTubeDown;
+use Data::Dumper;
 
-JWZ::YouTubeDown::download_video_url('http://www.youtube.com/watch?v=dGghkjpNCQ8','tmp.mp4');
+warn Dumper JWZ::YouTubeDown::fetch_url_info('http://www.youtube.com/watch?v=dGghkjpNCQ8');
