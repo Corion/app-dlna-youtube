@@ -18,6 +18,10 @@ Implement simple HTML client with Server Side Events
   #content_video.src= "http://remote.source.mp4"
   #content_video.play()
 
+=item *
+
+Add .m3u parser for audio streaming
+
 =back
 
 =cut
