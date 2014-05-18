@@ -7,7 +7,6 @@ use Plack::Request; # we do raw PSGI here :-/
 use Twiggy::Server;
 
 use Digest::SHA qw(sha256_hex);
-use WebService::GData::YouTube; # Still uses LWP instead of AnyEvent...
 # Also, that API is deprecated. Will have to switch to a scraper then...
 use Carp qw(croak);
 use Data::Dumper;
@@ -100,13 +99,13 @@ sub add_url {
         url => $url,
         # max_size
         max_size => { x => undef, y => undef },
-        #duration => $v->duration,
         # Well, we should find out:
         file_size => undef,
         method => "stream",
         additional_headers => {
             referer => $options{ referrer }, # no typo here
         },
+        stream_info => $options{ stream_info },
     });
 };
 
@@ -363,6 +362,141 @@ sub find_target_transcoder {
 1;
 
 package AnyEvent::TimedFileStreamer;
+
+package Media::Info::AnyEvent;
+use strict;
+
+# Promise-style media information
+
+sub new {
+    my $class= shift;
+    my( %self )= @_;
+    my $self= bless \%self, $class;
+    # Trampoline into fetching the information
+    # Rate limiting is the duty of the caller
+    $self{ cb }||= AnyEvent->condvar;
+    my $t; $t= AnyEvent->timer( after => 0, cb => sub { $self->fetch_info; undef $t } );
+    $self
+}
+
+sub set_info {
+    my( $self, %info )= @_;
+    @{$self}{ keys %info }= values %info;
+    $_[0]->{cb}->send( $self );
+};
+
+sub get_info {
+    my $info= $_[0]->{cb}->recv;
+    warn Dumper $info;
+    #$_[0]->{cb}->recv;
+    $info
+};
+
+sub content_type { $_[0]->get_info->{ct} }
+sub duration { $_[0]->get_info->{duration} }
+sub url { $_[0]->{url} }
+
+package Media::Info::AnyEvent::YouTube;
+use strict;
+use Carp qw( croak );
+use Data::Dumper;
+use parent '-norequire', 'Media::Info::AnyEvent';
+use URI::Escape 'uri_unescape';
+use WebService::GData::YouTube; # Still uses LWP instead of AnyEvent...
+
+# Code taken from JWZ's youtubedown
+
+sub canonical_video_info {
+    my( $self, $url )= @_;
+    my $org_url= $url;
+
+    # Rewrite youtu.be URL shortener.
+    $url =~ s@^https?://([a-z]+\.)?youtu\.be/@http://youtube.com/v/@si;
+
+    $url =~ s@^https:@http:@s;	# No https.
+
+    my ($id, $site, $playlist_p);
+
+    # Youtube /view_play_list?p= or /p/ URLs. 
+    if ($url =~ m@^https?://(?:[a-z]+\.)?(youtube) (?:-nocookie)? \.com/
+                (?: view_play_list\?p= |
+                    p/ |
+                    embed/p/ |
+                    playlist\?list=(?:PL)? |
+                    embed/videoseries\?list=(?:PL)?
+                )
+                ([^<>?&,]+) ($|&) @sx) {
+      ($site, $id) = ($1, $2);
+      $url = "http://www.$site.com/view_play_list?p=$id";
+      $playlist_p = 1;
+
+    # Youtube /watch/??v= or /watch#!v= or /v/ URLs. 
+    } elsif ($url =~ m@^https?:// (?:[a-z]+\.)?
+                     (youtube) (?:-nocookie)? (?:\.googleapis)? \.com/+
+                     (?: (?: watch/? )? (?: \? | \#! ) v= |
+                         v/ |
+                         embed/ |
+                         .*? &v= |
+                         [^/\#?&]+ \#p(?: /[a-zA-Z\d] )* /
+                     )
+                     ([^<>?&,\'\"]+) ($|[?&]) @sx) {
+      ($site, $id) = ($1, $2);
+      $url = "http://www.$site.com/watch?v=$id";
+
+    # Youtube "/verify_age" URLs.
+    } elsif ($url =~ 
+           m@^https?://(?:[a-z]+\.)?(youtube) (?:-nocookie)? \.com/+
+	     .* next_url=([^&]+)@sx ||
+           $url =~ m@^https?://(?:[a-z]+\.)?google\.com/
+                     .* service = (youtube)
+                     .* continue = ( http%3A [^?&]+)@sx ||
+           $url =~ m@^https?://(?:[a-z]+\.)?google\.com/
+                     .* service = (youtube)
+                     .* next = ( [^?&]+)@sx
+          ) {
+      $site = $1;
+      $url = uri_unescape($2);
+      if ($url =~ m@&next=([^&]+)@s) {
+        $url = uri_unescape($1);
+        $url =~ s@&.*$@@s;
+      }
+  };
+    
+    die "No ID found in $org_url ($url)"
+        unless $id;
+    return {
+        url => $url,
+        site => $site,
+        id => $id,
+        is_playlist => $playlist_p,
+    }
+}
+
+sub fetch_info {
+    my( $self )= @_;
+    my $headers= $self->{ headers } || {};
+    
+    my $info= $self->canonical_video_info( $self->{url} );
+    #http_head $self->{url},
+    #    headers => $headers,
+    #    sub {
+    #        my( $body, $headers )= @_;
+    #        my %info;
+    #        $info{ ct }= $headers->{ content_type };
+    #        
+    #        $self->set_info(
+    #    };
+warn "Fetching info for $info->{id}";
+    my $yt = new WebService::GData::YouTube();
+    my $video= $yt->get_video_by_id($info->{id});
+warn "Got " . Dumper $video;
+warn sprintf "%d s", $video->duration;
+    
+    for (qw( duration title )) {
+        $info->{$_}= $video->$_;
+    };
+    $self->set_info($info);
+};
 
 package HTTP::Response::DLNA;
 use strict;
