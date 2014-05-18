@@ -1,0 +1,23 @@
+=head1 TO DO
+
+=head2 HTML CLIENT
+
+=over 4
+
+=item *
+
+Implement simple HTML client with Server Side Events
+
+  <html>
+  <body>
+  <video id="content_video"></video>
+  <audio id="content_video"></audio>
+  </body>
+  </html>
+
+  #content_video.src= "http://remote.source.mp4"
+  #content_video.play()
+
+=back
+
+=cut
