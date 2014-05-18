@@ -158,8 +158,14 @@ sub serve_media {
     # Subtitles via SubtitleHttpHeader.sec
 
     if( $req->headers->{'getmediainfo.sec'} ) {
-        #$response_header{"MediaInfo.sec"}= "SEC_Duration=" . $info->{duration} . ";";
-        $response_header{"MediaInfo.sec"}= "SEC_Duration=2667000;";
+        #$response_header{"MediaInfo.sec"}= "SEC_Duration=" . $info->{duration} . ";";+
+        my $d;
+        if( $info->{stream_info} ) {
+            $d= $info->{stream_info}->duration*1000
+        } else {
+            $d= 2667000; # magic number that was used in the first video I tested
+        };
+        $response_header{"MediaInfo.sec"}= "SEC_Duration=10000;";
         
     };
 
