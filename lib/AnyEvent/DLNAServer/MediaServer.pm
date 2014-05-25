@@ -76,14 +76,38 @@ sub handle_request {
         [ 500, [], ["Internal Server Error" ]];
 };
 
+sub ct_from_ext {
+    my( $self, $file )= @_;
+    # Make up a Content-Type if we have none
+    my %extmap= (
+        avi => "video/x-msvideo",
+        ts => "video/mpeg",
+        divx => "video/mpeg",
+        mp4 => "video/MP4V-ES",
+        mkv => "video/x-msvideo",
+        mp3 => "audio/mpeg",
+        #flac => "audio/...", # needs a transcoder
+        #ogg => "audio/...", # needs a hippie
+    );
+    $file =~ /\.([A-Za-z0-9]+)$/
+        or warn "Unknown extension in '$file'";
+    warn "Got '$1' / $extmap{ $1 }";
+    
+    return $extmap{ lc $1 } || 'x-application/binary';
+};
+
 sub add_file {
     my( $self, $file )= @_;
+    
+    my $ct= $self->ct_from_ext( $file );
+    warn "Mapped $file to $ct";
+    
     my $info = {
             file_size => -s $file,
             url => $file,
             max_size => { x => undef, y => undef, },
             duration => 3600, # fake it till you make it!
-            ct => 'video/mp4v',
+            ct => $ct,
             # Hrmm - can we open uglified file URIs? :-/
             method => "local",
         };
