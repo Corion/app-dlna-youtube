@@ -1,5 +1,9 @@
 =head1 TO DO
 
+=head2 Modules
+
+Look at L<App::YTLD> instead of rolling your own (or stealing from jwz)
+
 =head2 HTML CLIENT
 
 =over 4
@@ -21,6 +25,13 @@ Implement simple HTML client with Server Side Events
 =item *
 
 Add .m3u parser for audio streaming
+
+=item *
+
+Add serving of playlist by setting both
+
+  $renderer->setAVTransportURI(CurrentURI => $url);
+  $renderer->setNextAVTransportURI(CurrentURI => $url);
 
 =back
 
