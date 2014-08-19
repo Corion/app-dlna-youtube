@@ -1,0 +1,15 @@
+# Play video
+[
+{"element":"video", "command": {"method":"pause", "args":[]}},
+{"element":"audio", "property": {"src":"http://aliens.maischein.home:8080/mp3/Ministry%20Of%20Sound%20-%20Funky%20House%20Classics/CD-3_Various_Artists_-_14_-_Let_The_Sun_Shine.mp3", "type": "audio/mp3", "autoplay":1}},
+{"element":"audio", "command": {"method":"play", "args":[]}},
+{"element":"player", "command": {"method":"showContainer", "args":["audio"]}, "args": []}
+]
+
+# Play audio
+[
+{"element":"audio", "command": {"method":"pause", "args":[]}},
+{"element":"video", "property": {"src":"http://aliens.maischein.home:8080/movies/The.Great.Gatsby.2013.720p.BluRay.x264.YIFY.mp4", "type": "video/mp4", "autoplay":1}},
+{"element":"video", "command": {"method":"play", "args":[]}},
+{"element":"player", "command": {"method":"showContainer", "args":["video"]}, "args": []}
+]

@@ -1,0 +1,69 @@
+# public broadcast
+# Perltube / CamelCast / ironcast.datenzoo.de
+# /command -> Queue URLs , playlist, preview? forward/back/next
+# /watch -> mediaviewer.html
+# / -> about.html, QR code for quick connect
+# Convert Youtube to straight HTTP
+#     Remember Youtube video ids
+# Broadcast URL to client(s)
+# "Connected clients"
+# mediaviewer.html:
+#     fullscreen
+#
+# Events: image / video / audio ?
+
+=head2 To-do
+
+=over 4
+
+=item *
+
+Keep track of playing-time for latecomers
+
+This seems to need far more advanced handling, as the C<currentTime>
+property can only be set after the resource has been loaded.
+
+=item *
+
+Image slideshow
+
+The master can set a new, rotating image from a loop
+every n seconds.
+
+=item *
+
+One-shared-playlist, as this is an MVP. Channels come later
+
+=back
+
+=head2 Later
+
+=over 4
+
+=item *
+
+Channels
+
+=item *
+
+Watermark image (Mike)
+
+=item *
+
+Proxy local content for re-streaming
+
+=back
+
+=head2 Done
+
+=over 4
+
+=item *
+
+audio art
+
+=item *
+
+Watermark
+
+=back
