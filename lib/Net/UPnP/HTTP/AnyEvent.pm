@@ -42,6 +42,8 @@ sub post {
 		);
 
     my $done= AnyEvent->condvar;
+    $add_header||= {};
+    $add_header->{ "friendlyname.dlna.org" }= "Perl/DLNA 1.0";
     #warn "$method http://$post_addr:$post_port$path";
     http_request $method, "http://$post_addr:$post_port$path",
         headers => $add_header,
