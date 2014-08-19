@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html>
-<head>
+<head><title>mediaclient</title>
+<style>
+.watermark {
+    opacity: 0.5;
+    color: BLACK;
+    position: absolute;
+    font-family: Arial, Helvetica, Sans-Serif;
+    font-size: 2vmin;
+    bottom: 5%;
+    right: 5%;
+}
+</style>
 <script>
 
 var DLNAplayer= {
@@ -18,7 +29,11 @@ var DLNAplayer= {
         };
         if( payload.property ) {
             for( var p in payload.property ) {
-                obj[ p ]= payload.property[p];
+                try {
+                    obj[ p ]= payload.property[p];
+                } catch(e) {
+                    alert("Property 'p' is problematic: " + e );
+                }
             };
         };
         if( payload.command ) {
@@ -50,7 +65,8 @@ function myonload() {
     //DLNAplayer.handleEvent({"element":"player", "command": {"method":"showContainer", "args":["video"]}, "args": []});
     //DLNAplayer.handleEvent({"element":"audio", "property": {"src":"http://aliens.maischein.home:8080/mp3/Ministry%20Of%20Sound%20-%20Funky%20House%20Classics/CD-3_Various_Artists_-_14_-_Let_The_Sun_Shine.mp3", "type": "audio/mp3", "autoplay":1}});
     //DLNAplayer.handleEvent({"element":"audio", "command": {"method":"play", "args":[]}});
-    //DLNAplayer.handleEvent({"element":"player", "command": {"method":"showContainer", args:["audio"]}, "args": []});
+    // {"element":"audio_image", "property": {"src":"http://aliens.maischein.home:8080/mp3/Ministry%20Of%20Sound%20-%20Funky%20House%20Classics/716673.jpg", "style":"height:100%"}},
+    //DLNAplayer.handleEvent({"element":"player", "command": {"method":"showContainer", "args":["audio"]}, "args": []});
 };
 
 var events = new EventSource('/dlna');
@@ -76,8 +92,10 @@ events.addEventListener('dlna', function(event) {
 </video>
 </div>
 <div class="container audio" style="display:none">
+<img src="" id="audio_image">
 <audio id="audio" width="100%" height="100%" controls class="render audio">
 </audio>
 </div>
+<div class="watermark">mediaplayer.html</div>
 </body>
 </html>
