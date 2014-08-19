@@ -14,6 +14,14 @@ use URI;
 use URI::file;
 use AnyEvent::HTTP;
 
+if( $^O =~ /mswin32/i ) {
+    require HTTP::Logger::Win32; # for fancy parallel request logging
+};
+
+# minidlna claims that (some) Samsung devices access /MTA/
+# Find out what that is, later, and serve it too.
+# http://lists.freebsd.org/pipermail/freebsd-ports/attachments/20110204/50a89a95/patch-zsamsung-0001.obj
+
 use vars '$stream_from_disk_rate';
 $stream_from_disk_rate= 1024*1024*10; # stream 10 MB/s per stream from disk
 
@@ -153,6 +161,8 @@ sub proxied_info {
     $self->{ proxy_urls }->{ $id };
 }
 
+# http://wiki.samygo.tv/index.php5/Media_Play_and_DLNA
+
 # Recognize Samsung devices via
 # User-Agent =~ /SEC_HHP_.*/
 # Add transcoding list from http://www.mattsbits.co.uk/item-105.html
@@ -169,27 +179,33 @@ sub serve_media {
     warn Dumper $req->headers;
     if( $req->headers->{'getcontentfeatures.dlna.org'} ) {
         # Also see http://libdlna.sourcearchive.com/documentation/0.2.3/dlna_8h-source.html
-        $response_header{"contentFeatures.dlna.org"} = 'DLNA.ORG_PN=MPEG4_P2_MP4_SP_AAC;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
+        #$response_header{"contentFeatures.dlna.org"} = 'DLNA.ORG_PN=MPEG4_P2_MP4_SP_AAC;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000';
+        $response_header{"contentFeatures.dlna.org"} = 'DLNA.ORG_PN=MPEG4_P2_MP4_SP_AAC;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01500000000000000000000000000000'; # for Samsung
     };
+
     # Respect the Range for easy streaming
     # $response->header(Content_Range => "bytes $startrange-$endrange/$size");
-    $response_header{"TransferMode.DLNA.ORG"}= 'Streaming';
+    $response_header{"TransferMode.DLNA.ORG"}= 'Streaming'; # also, "Backgruond" or "Interactive"
 
     # TimeSeekRange.dlna.org: npt=0-;
     # If we know the time, we can do:
 
+    # Samsung:
     # getCaptionInfo.sec ?
+    # -> return URL of subtitles in CaptionInfo.sec header
     # Subtitles via SubtitleHttpHeader.sec
 
     if( $req->headers->{'getmediainfo.sec'} ) {
+        # MediaInfo.sec is in miliseconds
         #$response_header{"MediaInfo.sec"}= "SEC_Duration=" . $info->{duration} . ";";+
         my $d;
         if( $info->{stream_info} ) {
             $d= $info->{stream_info}->duration*1000
         } else {
-            $d= 2667000; # magic number that was used in the first video I tested
+            #$d= 2667000; # magic number that was used in the first video I tested
+            $d= 2*60*60*1000; # magic number that was used in the first video I tested
         };
-        $response_header{"MediaInfo.sec"}= "SEC_Duration=10000;";
+        $response_header{"MediaInfo.sec"}= "SEC_Duration=$d;";
         
     };
 
@@ -206,6 +222,8 @@ sub serve_media {
     };
 };
 
+my $http_logger= HTTP::Logger::Win32->new();
+
 sub serve_media_file {
     my( $self, $info, $status, $headers, $req )= @_;
     # Simply serve a local file first:
@@ -221,6 +239,12 @@ sub serve_media_file {
     };
 
     warn "File: $method";
+    # "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*" # infinite lag, prebuffer as much as you need
+    # DLNA spec 7.5.4.3.3.20.6, Range requests always get infinite lag
+                # Only send them if realtimeinfo.dlna.org was requested!
+    $headers->{"realTimeInfo.dlna.org"} = "DLNA.ORG_TLAG=1.75"; # Start playback after a second
+
+    my $desc= $method;
 
     my ($startrange, $endrange) = (0,$size-1);
     if( $req->headers->{range}
@@ -228,35 +252,53 @@ sub serve_media_file {
         ($startrange,$endrange) = ($1, ($2 || $endrange));
         $status= 206;
         $headers->{ "content-range" }= "bytes $startrange-$endrange/$size";
-        $headers->{ "content-type" }= "video/mp4v"; # faake, and bad if we serve an .avi :)
+        $headers->{"content-type" }= $info->{ct};
+        
+        # "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*" # infinite lag, prebuffer as much as you need
+        # DLNA spec 7.5.4.3.3.20.6, Range requests always get infinite lag
+        $headers->{"realTimeInfo.dlna.org"} = "DLNA.ORG_TLAG=*"; # at least for Range requests, c.f. 
+
+        #$headers->{ "content-type" }= "video/mp4v"; # faake, and bad if we serve an .avi :)
 
         warn "Seeking to $startrange";
+        $desc .= " $startrange-";
         if( $fh ) {
             seek $fh, $startrange,0
               or warn "Couldn't seek in $info->{url} : $!";
           };
         my $left= $endrange - $startrange;
         $headers->{"content-length"}= $left;
-        warn "Serving $left bytes";
+        #warn "Serving $left bytes";
     };
+
+    my $request= $http_logger->add_request( $desc );
 
     my $header_response= sub {
         my( $write_header )= @_;
         
-        warn "File: $method response: " . Dumper $headers;
+        $self->header_patchup( media => $info, media_headers => undef, request => $req, response => $headers );
+
+        #warn sprintf "%s: File: %s response: %s",
+        #    $requests{ $request }->{desc}, $method, Dumper $headers;
         my $body_writer= $write_header->([ $status, [ %$headers ]]);
 
         if( 'HEAD' eq $method ) {
-            $body_writer->close;
+            warn "HEAD response: $status";
+            $http_logger->remove_request( $request );
+            eval {
+                $body_writer->close;
+            };
+            warn $@ if $@;
             return;
         };
-        my $timer; $timer= AnyEvent->timer( after => 0, interval => 1, cb => sub {
+        my $timer; $timer= AnyEvent->timer( after => 0, interval => 0.1, cb => sub {
             $|++;
-            print ".";
             
             my $shutdown;
-            if(read $fh, my $buffer, $stream_from_disk_rate) {
+            my $read;
+            if($read= read $fh, my $buffer, $stream_from_disk_rate / 10) {
                 local $@;
+                $http_logger->update_request( $request, $read );
                 my $lived= eval {
                     $body_writer->write($buffer);
                     1;
@@ -267,7 +309,7 @@ sub serve_media_file {
                 $shutdown= 1;
             };
             if( $shutdown ) {
-                print "done.\n";
+                $http_logger->remove_request( $request, $read );
                 $body_writer->close;
                 undef $timer;
             };
@@ -293,10 +335,14 @@ sub serve_media_stream {
     };
     
     my $method= $req->method;
-
+    
+# Auto-retry/convert HEAD to GET on 5xx errors
+# How can we determine when to force GET?!
+#$method= 'GET';
     my $header_response= sub {
         my( $write_header )= @_;
-        warn "Starting to respond to $method";
+        my $request= $http_logger->add_request( $method );
+        warn "$request: Starting to respond to $method with proxied info from $info->{url}";
         #warn "Fetching YT";
         my $body_writer;
         my $get_guard;
@@ -305,7 +351,7 @@ RETRY:
         $get_guard= http_request $method => $info->{url},
             headers => \%request_headers,
             handle_params => {
-                max_read_size => 1024*1024, # 1 MB buffer per client connection
+                max_read_size => 1*1024*1024, # 1 MB buffer per client connection
             },
             on_header => sub {
                 my($remote_headers)= @_;
@@ -324,17 +370,34 @@ RETRY:
                     $response_headers->{ $_ }= $remote_headers->{ $_ }
                         if defined $remote_headers->{ $_ };
                 };
-                $response_headers->{ "content-type" } =~ s!/mp4$!/mp4v!;
-                #$response_headers->{ "content-type" }= 'video/avi';
+                
+                $response_headers->{ "content-type" }||= $info->{ct} || $self->ct_from_ext($info->{url});
                 $status= $remote_headers->{Status}; # Pass through errors and Range replies
-                warn Dumper [%$response_headers];
+
+                # "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*" # infinite lag, prebuffer as much as you need
+                # DLNA spec 7.5.4.3.3.20.6, Range requests always get infinite lag
+                # Only send them if realtimeinfo.dlna.org was requested!
+                if( $request_headers{"content-range"}) {
+                    $response_headers->{"realTimeInfo.dlna.org"} = "DLNA.ORG_TLAG=*";
+                } else {
+                    #$response_headers->{"realTimeInfo.dlna.org"} = "DLNA.ORG_TLAG=1.75";
+                };
+
+                $self->header_patchup( media => $info, media_headers => $remote_headers, request => $req, response => $response_headers );
+
+                #warn Dumper [%$response_headers];
                 $body_writer= $write_header->( [$status, [ %$response_headers ] ]);
                 #warn "Wrote header, have body part $body_writer, waiting for body";
                 
                 if('HEAD' eq $method) {
                     undef $get_guard;
-                    $body_writer->write('');
-                    $body_writer->close;
+                    warn "HEAD response: $status";
+                    $http_logger->remove_request( $request );
+                    eval {
+                        $body_writer->write('');
+                        $body_writer->close;
+                    };
+                    warn $@ if $@;
                     return 0; # we're done
                 };
                 
@@ -344,9 +407,9 @@ RETRY:
                 my( $partial_body, $headers )= @_;
                 #warn "Body response: " . $headers->{Status};
                 $|++;
-                print ".";
                 my $continue;
                 if( length $partial_body ) {
+                    $http_logger->update_request( $request, length $partial_body );
                     eval {
                         $body_writer->write( $partial_body );
                         $continue= 1;
@@ -360,13 +423,21 @@ RETRY:
             # Cleanup
             sub { 
                 my( $body, $headers )= @_;
-                #warn "Final response: " . $headers->{Status};
-                print "done\n";
-                $body_writer->close;
-                undef $get_guard;
+                warn "Final response: " . $headers->{Status};
+                $http_logger->remove_request( $request );
+                $body_writer->close
+                    if $body_writer;
             };
     };
     return $header_response;
+};
+
+# Also see HTTP::Response::DLNA
+sub header_patchup {
+    my( $self, %options )= @_;
+
+    # See above for remapping the content-type / extension
+    $options{response}->{ "content-type" } =~ s!/mp4$!/mp4v!;
 };
 
 # Map MIME info and an UA to an appropriate transcoder
