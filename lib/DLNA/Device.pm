@@ -1,7 +1,11 @@
 package DLNA::Device;
 use strict;
 
-# Cache, ping and re-find DLNA devices
+=head1 NAME
+
+DLNA::Device - Cache, ping and re-find DLNA devices
+
+=cut
 
 use DB_File;
 use Net::UPnP::HTTP::AnyEvent; # overrides Net::UPnP::HTTP
