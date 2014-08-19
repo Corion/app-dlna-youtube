@@ -57,8 +57,8 @@ print sprintf "Playback of %s using %s\n", $url, $device->getfriendlyname;
 #system(sprintf q(start perl -Ilib -w dlna-play-url.pl -d %s "%s"), $device->getfriendlyname, $url);
 
 my $renderer = Net::UPnP::AV::MediaRenderer->new();
-use Data::Dumper;
-warn Dumper $device->getservicebyname($Net::UPnP::AV::MediaRenderer::AVTRNSPORT_SERVICE_TYPE);
+#use Data::Dumper;
+#warn Dumper $device->getservicebyname($Net::UPnP::AV::MediaRenderer::AVTRNSPORT_SERVICE_TYPE);
 $renderer->setdevice($device);
 $renderer->stop();
 
